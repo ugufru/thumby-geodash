@@ -32,12 +32,25 @@ cd thumby-geodash
 
 ### 2. Deploy to Thumby Color
 
-1. Connect Thumby Color via USB-C
-2. Open [Thonny](https://thonny.org/) IDE and select the MicroPython interpreter for RP2350
-3. In Thonny's file browser, navigate to the device filesystem
-4. Create a `/Games/GeoDash/` folder on the device if it doesn't exist
-5. Upload all project files (`main.py`, `manifest.ini`, `icon.bmp`, `outrunner_outline.bmp`) into `/Games/GeoDash/`
-6. The game will appear in the Thumby Color launcher automatically
+Connect the Thumby Color via USB-C, then use [mpremote](https://docs.micropython.org/en/latest/reference/mpremote.html) to copy files:
+
+```bash
+# Install mpremote if needed
+pip install mpremote
+
+# Create the game folder (first time only)
+mpremote fs mkdir /Games/GeoDash
+
+# Deploy all game files
+mpremote fs cp main.py :/Games/GeoDash/main.py
+mpremote fs cp manifest.ini :/Games/GeoDash/manifest.ini
+mpremote fs cp icon.bmp :/Games/GeoDash/icon.bmp
+mpremote fs cp outrunner_outline.bmp :/Games/GeoDash/outrunner_outline.bmp
+```
+
+The game will appear in the Thumby Color launcher automatically.
+
+Alternatively, you can use [Thonny](https://thonny.org/) IDE to browse the device filesystem and copy files manually to `/Games/GeoDash/`.
 
 ## Development
 

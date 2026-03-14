@@ -19,11 +19,11 @@ from engine_draw import Color
 # =============================================================================
 
 # Physics (Y-down: +Y = down on screen)
-GRAVITY = 0.35
-JUMP_VEL = -5.0
+GRAVITY = 0.70
+JUMP_VEL = -10.0
 GROUND_Y = 45
 PLAYER_X = -30
-PLAYER_SIZE = 10
+PLAYER_SIZE = 20
 DEATH_Y = 75
 
 # Screen bounds (camera-relative)
@@ -31,12 +31,12 @@ SCREEN_MIN = -64
 SCREEN_MAX = 64
 
 # Speeds
-BASE_SCROLL = 1.5
-MAX_SCROLL = 3.5
+BASE_SCROLL = 3.0
+MAX_SCROLL = 7.0
 
 # Ground
-GROUND_SEG_W = 24
-GROUND_SEG_H = 20
+GROUND_SEG_W = 48
+GROUND_SEG_H = 40
 NUM_GROUND = 12
 
 # Obstacles
@@ -130,7 +130,7 @@ obstacles = []
 ob_types = []
 ob_active = []
 for i in range(NUM_OBSTACLES):
-    ob = Rectangle2DNode(width=8, height=8, opacity=0.0)
+    ob = Rectangle2DNode(width=16, height=16, opacity=0.0)
     ob.position = Vector2(OBSTACLE_HIDE_X, 0)
     ob.layer = 3
     obstacles.append(ob)
@@ -140,7 +140,7 @@ for i in range(NUM_OBSTACLES):
 # --- Background particles ---
 particles = []
 for i in range(NUM_PARTICLES):
-    p = Rectangle2DNode(color=COL_DARK_PURPLE, width=2, height=2, opacity=0.3)
+    p = Rectangle2DNode(color=COL_DARK_PURPLE, width=4, height=4, opacity=0.3)
     p.position = Vector2(random.uniform(SCREEN_MIN, SCREEN_MAX),
                          random.uniform(-50, 30))
     p.layer = 0
@@ -153,7 +153,7 @@ flash.layer = 6
 # --- HUD text nodes ---
 title_text = Text2DNode(font=font, text="GEODASH", position=Vector2(0, -20),
                         opacity=0.0, layer=7)
-title_text.scale = Vector2(2.0, 2.0)
+title_text.scale = Vector2(4.0, 4.0)
 
 score_text = Text2DNode(font=font, text="0", position=Vector2(0, -55),
                         opacity=0.0, layer=7)
@@ -244,17 +244,17 @@ def spawn_obstacle():
             if random.random() < 0.5:
                 # Spike
                 ob_types[i] = "spike"
-                obstacles[i].width = 8
-                obstacles[i].height = 8
+                obstacles[i].width = 16
+                obstacles[i].height = 16
                 obstacles[i].color = COL_PINK
                 obstacles[i].rotation = math.pi / 4
                 obstacles[i].position = Vector2(OBSTACLE_SPAWN_X,
-                                                GROUND_Y - 4)
+                                                GROUND_Y - 8)
             else:
                 # Block
                 ob_types[i] = "block"
-                h = random.choice([10, 15, 20])
-                obstacles[i].width = 10
+                h = random.choice([20, 30, 40])
+                obstacles[i].width = 20
                 obstacles[i].height = h
                 obstacles[i].color = COL_VIOLET
                 obstacles[i].rotation = 0.0
@@ -278,8 +278,8 @@ def check_collision():
         oy = obstacles[i].position.y
 
         if ob_types[i] == "spike":
-            ow = 8 * 0.7
-            oh = 8 * 0.7
+            ow = 16 * 0.7
+            oh = 16 * 0.7
         else:
             ow = obstacles[i].width
             oh = obstacles[i].height
