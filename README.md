@@ -41,7 +41,7 @@ cd thumby-geodash
 
 ## Development
 
-See [USER_GUIDE.md](USER_GUIDE.md) for engine API reference and development patterns.
+See [DEV_GUIDE.md](DEV_GUIDE.md) for engine API reference and development patterns.
 
 ## Device Specifications
 
