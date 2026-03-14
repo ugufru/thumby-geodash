@@ -9,7 +9,7 @@ import engine_draw
 import engine_audio
 import engine_save
 from engine_nodes import Rectangle2DNode, CameraNode, Text2DNode
-from engine_resources import FontResource, ToneSoundResource
+from engine_resources import FontResource, ToneSoundResource, WaveSoundResource
 from engine_math import Vector2
 from engine_draw import Color
 
@@ -81,6 +81,7 @@ snd_jump = ToneSoundResource()
 snd_jump.frequency = 800
 snd_death = ToneSoundResource()
 snd_death.frequency = 200
+snd_bgm = None
 
 
 # =============================================================================
@@ -236,8 +237,27 @@ def reset_game():
     flash.opacity = 0.0
 
 
+def gap_near_spawn():
+    """Check if any gap segment is near the right side of the screen."""
+    for i in range(NUM_GROUND):
+        if ground_is_gap[i] and ground_segs[i].position.x > 30:
+            return True
+    return False
+
+
+def obstacle_too_close():
+    """Check if any active obstacle is still near the spawn zone."""
+    for i in range(NUM_OBSTACLES):
+        if ob_active[i] and obstacles[i].position.x > 20:
+            return True
+    return False
+
+
 def spawn_obstacle():
     global spawn_timer
+    # Don't spawn if too close to another obstacle or near a gap
+    if obstacle_too_close() or gap_near_spawn():
+        return
     for i in range(NUM_OBSTACLES):
         if not ob_active[i]:
             ob_active[i] = True
@@ -305,6 +325,7 @@ def trigger_death():
     dead_timer = 0
     flash.opacity = 0.8
     engine_audio.stop(0)
+    engine_audio.stop(2)
     engine_audio.play(snd_death, 1, False)
     snd_death_timer = 30
     engine_io.rumble(0.5)
@@ -345,6 +366,8 @@ while True:
                 press_a_text.opacity = 0.0
                 hi_text.opacity = 0.0
                 score_text.opacity = 1.0
+                snd_bgm = WaveSoundResource("bgm.wav")
+                engine_audio.play(snd_bgm, 2, True)
 
         # ===============
         # STATE: PLAYING
@@ -355,9 +378,9 @@ while True:
             display_score = score // 6
             score_text.text = str(display_score)
 
-            # Difficulty scaling
-            scroll_speed = min(BASE_SCROLL + display_score * 0.005, MAX_SCROLL)
-            spawn_interval = max(45, 90 - display_score // 4)
+            # Difficulty scaling (gradual ramp)
+            scroll_speed = min(BASE_SCROLL + display_score * 0.002, MAX_SCROLL)
+            spawn_interval = max(60, 90 - display_score // 8)
 
             # --- Jump ---
             if engine_io.A.is_just_pressed and on_ground:
@@ -521,3 +544,5 @@ while True:
                 score_text.opacity = 1.0
                 score_text.position.y = -55
                 press_a_text.position.y = 10
+                snd_bgm = WaveSoundResource("bgm.wav")
+                engine_audio.play(snd_bgm, 2, True)
