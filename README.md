@@ -21,12 +21,23 @@ GeoDash/
 └── outrunner_outline.bmp    # Font bitmap (from engine assets)
 ```
 
-## Deploy to Device
+## Installation
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/ugufru/thumby-geodash.git
+cd thumby-geodash
+```
+
+### 2. Deploy to Thumby Color
 
 1. Connect Thumby Color via USB-C
-2. Open [Thonny](https://thonny.org/) IDE
-3. Copy the entire project folder to `/Games/GeoDash/` on the device filesystem
-4. The game will appear in the launcher automatically
+2. Open [Thonny](https://thonny.org/) IDE and select the MicroPython interpreter for RP2350
+3. In Thonny's file browser, navigate to the device filesystem
+4. Create a `/Games/GeoDash/` folder on the device if it doesn't exist
+5. Upload all project files (`main.py`, `manifest.ini`, `icon.bmp`, `outrunner_outline.bmp`) into `/Games/GeoDash/`
+6. The game will appear in the Thumby Color launcher automatically
 
 ## Development
 
