@@ -48,6 +48,9 @@ OBSTACLE_HIDE_X = 200
 NUM_PARTICLES = 8
 NUM_STARS = 12
 
+# Death particles
+NUM_DEATH_PARTICLES = 20
+
 # Trail
 NUM_TRAIL = 3
 
@@ -95,7 +98,7 @@ snd_bgm = None
 # =============================================================================
 
 # --- Player ---
-player = Rectangle2DNode(color=COL_CYAN, width=PLAYER_SIZE, height=PLAYER_SIZE)
+player = Rectangle2DNode(color=COL_CYAN, width=PLAYER_SIZE, height=PLAYER_SIZE, opacity=0.0)
 player.position = Vector2(PLAYER_X, GROUND_Y - PLAYER_SIZE / 2)
 player.layer = 3
 
@@ -193,6 +196,15 @@ for i in range(NUM_STARS):
     s.layer = 0
     stars.append(s)
 
+# --- Death explosion particles ---
+death_particles = []
+death_vels = []
+for i in range(NUM_DEATH_PARTICLES):
+    dp = Rectangle2DNode(color=COL_CYAN, width=4, height=4, opacity=0.0)
+    dp.layer = 5
+    death_particles.append(dp)
+    death_vels.append((0.0, 0.0))
+
 # --- Screen flash overlay ---
 flash = Rectangle2DNode(color=COL_MAGENTA, width=128, height=128, opacity=0.0)
 flash.layer = 6
@@ -227,6 +239,8 @@ spawn_interval = 90
 dead_timer = 0
 menu_pulse = 0.0
 gap_counter = 0
+post_gap_cooldown = 0
+falling_in_pit = False
 trail_history = []
 snd_jump_timer = 0
 snd_death_timer = 0
@@ -238,7 +252,7 @@ snd_death_timer = 0
 
 def reset_game():
     global vel_y, on_ground, scroll_speed, score, spawn_timer, spawn_interval
-    global dead_timer, gap_counter, trail_history
+    global dead_timer, gap_counter, post_gap_cooldown, falling_in_pit, trail_history
     global snd_jump_timer, snd_death_timer
 
     vel_y = 0.0
@@ -249,6 +263,8 @@ def reset_game():
     spawn_interval = 90
     dead_timer = 0
     gap_counter = 0
+    post_gap_cooldown = 0
+    falling_in_pit = False
     trail_history = []
     snd_jump_timer = 0
     snd_death_timer = 0
@@ -282,15 +298,19 @@ def reset_game():
     # Reset flash
     flash.opacity = 0.0
 
+    # Reset death particles
+    for dp in death_particles:
+        dp.opacity = 0.0
+
     # Reset sun
     sun.position.y = SUN_START_Y
     sun_halo.position.y = SUN_START_Y + 2
 
 
 def gap_near_spawn():
-    """Check if any gap segment is near the right side of the screen."""
+    """Check if any gap is between the player and the spawn zone."""
     for i in range(NUM_GROUND):
-        if ground_is_gap[i] and ground_segs[i].position.x > 30:
+        if ground_is_gap[i] and ground_segs[i].position.x > PLAYER_X - GROUND_SEG_W:
             return True
     return False
 
@@ -305,8 +325,8 @@ def obstacle_too_close():
 
 def spawn_obstacle():
     global spawn_timer
-    # Don't spawn if too close to another obstacle or near a gap
-    if obstacle_too_close() or gap_near_spawn():
+    # Don't spawn if too close to another obstacle, near a gap, or in post-gap cooldown
+    if obstacle_too_close() or gap_near_spawn() or post_gap_cooldown > 0:
         return
     for i in range(NUM_OBSTACLES):
         if not ob_active[i]:
@@ -370,10 +390,35 @@ def player_over_gap():
 
 
 def trigger_death():
-    global state, dead_timer, snd_death_timer
+    global state, dead_timer, snd_death_timer, death_vels
     state = STATE_DEAD
     dead_timer = 0
     flash.opacity = 0.8
+
+    # Spawn explosion particles in 3 layers (fast/medium/slow)
+    px = player.position.x
+    py = player.position.y
+    for i in range(NUM_DEATH_PARTICLES):
+        angle = random.uniform(0, 2 * math.pi)
+        layer = i % 3
+        if layer == 0:
+            speed = random.uniform(3.0, 4.5)
+            sz = 3
+        elif layer == 1:
+            speed = random.uniform(1.5, 2.5)
+            sz = 4
+        else:
+            speed = random.uniform(0.5, 1.2)
+            sz = 5
+        death_vels[i] = (math.cos(angle) * speed, math.sin(angle) * speed)
+        death_particles[i].position = Vector2(px, py)
+        death_particles[i].width = sz
+        death_particles[i].height = sz
+        death_particles[i].opacity = 1.0
+        col = random.choice([COL_CYAN, COL_PINK, COL_MAGENTA])
+        death_particles[i].color = col
+    player.opacity = 0.0
+
     engine_audio.stop(0)
     engine_audio.stop(2)
     engine_audio.play(snd_death, 1, False)
@@ -388,24 +433,25 @@ def trigger_death():
 while True:
     if engine.tick():
 
+        # --- Quit to launcher ---
+        if engine_io.MENU.is_just_pressed:
+            break
+
         # =============
         # STATE: MENU
         # =============
         if state == STATE_MENU:
             title_text.opacity = 1.0
+            press_a_text.text = "Press A"
             press_a_text.opacity = 1.0
+            hi_text.text = "To Start"
+            hi_text.opacity = 1.0
+            hi_text.position.y = 30
             score_text.opacity = 0.0
-            hi_text.opacity = 0.0
 
-            # Show high score on menu if exists
-            if hi_score > 0:
-                hi_text.text = "BEST " + str(hi_score)
-                hi_text.opacity = 1.0
-                hi_text.position.y = 30
-
-            # Pulsing player animation
+            # Pulsing player animation (subtle)
             menu_pulse += 0.05
-            player.opacity = 0.6 + 0.4 * math.sin(menu_pulse)
+            player.opacity = 0.15 + 0.15 * math.sin(menu_pulse)
             player.position.y = (GROUND_Y - PLAYER_SIZE / 2
                                  + 3 * math.sin(menu_pulse * 1.5))
 
@@ -428,9 +474,10 @@ while True:
             display_score = score // 6
             score_text.text = str(display_score)
 
-            # Difficulty scaling (gradual ramp)
-            scroll_speed = min(BASE_SCROLL + display_score * 0.002, MAX_SCROLL)
-            spawn_interval = max(60, 90 - display_score // 8)
+            # Difficulty scaling (step every 100 pts)
+            speed_level = display_score // 100
+            scroll_speed = min(BASE_SCROLL + speed_level * 0.5, MAX_SCROLL)
+            spawn_interval = max(60, 90 - speed_level * 5)
 
             # --- Jump ---
             if engine_io.A.is_just_pressed and on_ground:
@@ -455,16 +502,24 @@ while True:
 
             # --- Ground collision (Y-down: ground at +45, player above = lower Y) ---
             over_gap = player_over_gap()
-            if (not over_gap and
+            if over_gap:
+                post_gap_cooldown = 45  # frames to land + jump again
+                if player.position.y >= GROUND_Y and vel_y > 0:
+                    falling_in_pit = True
+            elif post_gap_cooldown > 0:
+                post_gap_cooldown -= 1
+
+            # Once falling into a pit, don't catch on the next ground segment
+            if falling_in_pit:
+                on_ground = False
+            elif (not over_gap and
                     player.position.y >= GROUND_Y - PLAYER_SIZE / 2):
                 player.position.y = GROUND_Y - PLAYER_SIZE / 2
                 vel_y = 0.0
                 if not on_ground:
-                    # Snap rotation to nearest 90 degrees
-                    snap = math.pi / 2
-                    player.rotation = round(player.rotation / snap) * snap
+                    player.rotation = 0.0
                 on_ground = True
-            elif over_gap or player.position.y < GROUND_Y - PLAYER_SIZE / 2:
+            elif player.position.y < GROUND_Y - PLAYER_SIZE / 2:
                 on_ground = False
 
             # Rotate while airborne
@@ -574,6 +629,14 @@ while True:
             if dead_timer == 15:
                 engine_io.rumble(0.0)
 
+            # Animate death particles
+            for i in range(NUM_DEATH_PARTICLES):
+                if death_particles[i].opacity > 0:
+                    vx, vy = death_vels[i]
+                    death_particles[i].position.x += vx
+                    death_particles[i].position.y += vy
+                    death_particles[i].opacity = max(0, 1.0 - dead_timer / 30.0)
+
             # Hide trail
             for t in trail:
                 t.opacity = 0.0
@@ -588,11 +651,15 @@ while True:
                     hi_score = display_score
                     engine_save.save("hi", hi_score)
 
+                player.opacity = 0.15
+                title_text.opacity = 1.0
+                title_text.position.y = -40
                 score_text.text = str(display_score)
-                score_text.position.y = -10
+                score_text.position.y = -15
                 hi_text.text = "BEST " + str(hi_score)
                 hi_text.opacity = 1.0
                 hi_text.position.y = 10
+                press_a_text.text = "Try Again?"
                 press_a_text.opacity = 1.0
                 press_a_text.position.y = 30
 
@@ -603,6 +670,7 @@ while True:
             if engine_io.A.is_just_pressed:
                 state = STATE_PLAYING
                 reset_game()
+                title_text.opacity = 0.0
                 press_a_text.opacity = 0.0
                 hi_text.opacity = 0.0
                 score_text.opacity = 1.0
