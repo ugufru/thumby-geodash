@@ -2,6 +2,8 @@
 
 A synthwave-themed Geometry Dash-style auto-scrolling platformer for the [Thumby Color](https://tinycircuits.com/products/thumby-color) handheld console.
 
+![GeoDash title screen](screenshot.png)
+
 ## Gameplay
 
 - **One-button controls**: Press **A** to jump
