@@ -31,7 +31,7 @@ SCREEN_MIN = -64
 SCREEN_MAX = 64
 
 # Speeds
-BASE_SCROLL = 3.0
+BASE_SCROLL = 4.5
 MAX_SCROLL = 7.0
 
 # Ground
@@ -45,7 +45,8 @@ OBSTACLE_SPAWN_X = 80
 OBSTACLE_HIDE_X = 200
 
 # Particles
-NUM_PARTICLES = 5
+NUM_PARTICLES = 8
+NUM_STARS = 12
 
 # Trail
 NUM_TRAIL = 3
@@ -57,6 +58,10 @@ COL_PINK = Color(1.0, 0.4, 0.7)
 COL_PURPLE = Color(0.47, 0.0, 0.53)
 COL_DARK_PURPLE = Color(0.15, 0.05, 0.25)
 COL_VIOLET = Color(0.57, 0.33, 0.76)
+COL_HOT_PINK = Color(1.0, 0.1, 0.5)
+COL_SUNSET_ORANGE = Color(1.0, 0.3, 0.1)
+COL_SUNSET_YELLOW = Color(1.0, 0.6, 0.1)
+COL_DEEP_BLUE = Color(0.05, 0.0, 0.15)
 
 # Game states
 STATE_MENU = 0
@@ -72,6 +77,7 @@ STATE_RETRY = 3
 engine.fps_limit(60)
 camera = CameraNode()
 font = FontResource("outrunner_outline.bmp")
+hud_font = FontResource("/system/assets/font5x7.bmp")
 
 # Save data
 engine_save.set_location("save.data")
@@ -116,15 +122,43 @@ ground_line = Rectangle2DNode(color=COL_MAGENTA, width=300, height=1)
 ground_line.position = Vector2(0, GROUND_Y)
 ground_line.layer = 2
 
-# --- Synthwave grid lines (below ground) ---
+# --- Sky gradient (horizon bands) ---
+sky_bands = []
+sky_colors = [COL_DEEP_BLUE, COL_DARK_PURPLE, COL_PURPLE, COL_HOT_PINK,
+              COL_SUNSET_ORANGE, COL_SUNSET_YELLOW]
+band_h = 16
+for i, col in enumerate(sky_colors):
+    b = Rectangle2DNode(color=col, width=300, height=band_h,
+                        opacity=0.6 if i < 3 else 0.45)
+    b.position = Vector2(0, -64 + i * band_h + band_h / 2)
+    b.layer = 0
+    sky_bands.append(b)
+
+# --- Sun glow ---
+SUN_START_Y = -50
+SUN_END_Y = GROUND_Y - 10
+sun = Rectangle2DNode(color=COL_SUNSET_YELLOW, width=30, height=16, opacity=0.5)
+sun.position = Vector2(0, SUN_START_Y)
+sun.layer = 0
+sun_halo = Rectangle2DNode(color=COL_SUNSET_ORANGE, width=50, height=24, opacity=0.25)
+sun_halo.position = Vector2(0, SUN_START_Y + 2)
+sun_halo.layer = 0
+
+# --- Synthwave grid lines (below ground, perspective spacing) ---
 grid_lines = []
-for i in range(4):
-    y = GROUND_Y + GROUND_SEG_H + 2 + i * 8
-    gl = Rectangle2DNode(color=COL_DARK_PURPLE, width=300, height=1,
-                         opacity=0.35 - i * 0.07)
+grid_y_offsets = [3, 8, 15, 24, 36]
+for i, dy in enumerate(grid_y_offsets):
+    y = GROUND_Y + dy
+    gl = Rectangle2DNode(color=COL_MAGENTA, width=300, height=1,
+                         opacity=0.5 - i * 0.08)
     gl.position = Vector2(0, y)
     gl.layer = 0
     grid_lines.append(gl)
+
+# --- Horizon line glow ---
+horizon_glow = Rectangle2DNode(color=COL_MAGENTA, width=300, height=2, opacity=0.3)
+horizon_glow.position = Vector2(0, GROUND_Y + 1)
+horizon_glow.layer = 0
 
 # --- Obstacle pool ---
 obstacles = []
@@ -138,14 +172,26 @@ for i in range(NUM_OBSTACLES):
     ob_types.append("spike")
     ob_active.append(False)
 
-# --- Background particles ---
+# --- Background particles (neon streaks, parallax) ---
 particles = []
+particle_colors = [COL_CYAN, COL_PINK, COL_MAGENTA, COL_HOT_PINK]
 for i in range(NUM_PARTICLES):
-    p = Rectangle2DNode(color=COL_DARK_PURPLE, width=4, height=4, opacity=0.3)
+    col = particle_colors[i % len(particle_colors)]
+    p = Rectangle2DNode(color=col, width=3, height=1, opacity=0.4)
     p.position = Vector2(random.uniform(SCREEN_MIN, SCREEN_MAX),
-                         random.uniform(-50, 30))
+                         random.uniform(-60, 20))
     p.layer = 0
     particles.append(p)
+
+# --- Stars (tiny dots in the sky) ---
+stars = []
+for i in range(NUM_STARS):
+    s = Rectangle2DNode(color=COL_CYAN, width=1, height=1,
+                        opacity=random.uniform(0.15, 0.5))
+    s.position = Vector2(random.uniform(SCREEN_MIN, SCREEN_MAX),
+                         random.uniform(-64, -10))
+    s.layer = 0
+    stars.append(s)
 
 # --- Screen flash overlay ---
 flash = Rectangle2DNode(color=COL_MAGENTA, width=128, height=128, opacity=0.0)
@@ -154,16 +200,16 @@ flash.layer = 6
 # --- HUD text nodes ---
 title_text = Text2DNode(font=font, text="GEODASH", position=Vector2(0, -20),
                         opacity=0.0, layer=7)
-title_text.scale = Vector2(4.0, 4.0)
+title_text.scale = Vector2(2.0, 2.0)
 
-score_text = Text2DNode(font=font, text="0", position=Vector2(0, -55),
-                        opacity=0.0, layer=7)
+score_text = Text2DNode(font=hud_font, text="0", position=Vector2(0, -55),
+                        opacity=0.0, layer=7, scale=Vector2(2.0, 2.0))
 
-press_a_text = Text2DNode(font=font, text="PRESS A", position=Vector2(0, 10),
-                          opacity=0.0, layer=7)
+press_a_text = Text2DNode(font=hud_font, text="PRESS A", position=Vector2(0, 10),
+                          opacity=0.0, layer=7, scale=Vector2(2.0, 2.0))
 
-hi_text = Text2DNode(font=font, text="", position=Vector2(0, 0),
-                     opacity=0.0, layer=7)
+hi_text = Text2DNode(font=hud_font, text="", position=Vector2(0, 0),
+                     opacity=0.0, layer=7, scale=Vector2(2.0, 2.0))
 
 
 # =============================================================================
@@ -235,6 +281,10 @@ def reset_game():
 
     # Reset flash
     flash.opacity = 0.0
+
+    # Reset sun
+    sun.position.y = SUN_START_Y
+    sun_halo.position.y = SUN_START_Y + 2
 
 
 def gap_near_spawn():
@@ -473,12 +523,26 @@ while True:
             if spawn_timer >= spawn_interval:
                 spawn_obstacle()
 
-            # --- Scroll particles (50% parallax) ---
+            # --- Sun descent ---
+            sun_y = min(SUN_START_Y + display_score * 0.15, SUN_END_Y)
+            sun.position.y = sun_y
+            sun_halo.position.y = sun_y + 2
+
+            # --- Scroll particles (neon streaks, 50% parallax) ---
             for p in particles:
                 p.position.x -= scroll_speed * 0.5
                 if p.position.x < SCREEN_MIN - 5:
                     p.position.x = SCREEN_MAX + 5
-                    p.position.y = random.uniform(-50, 30)
+                    p.position.y = random.uniform(-60, 20)
+
+            # --- Scroll stars (20% parallax, twinkle) ---
+            for s in stars:
+                s.position.x -= scroll_speed * 0.2
+                if s.position.x < SCREEN_MIN - 2:
+                    s.position.x = SCREEN_MAX + 2
+                    s.position.y = random.uniform(-64, -10)
+                # Twinkle
+                s.opacity = random.uniform(0.1, 0.5)
 
             # --- Check collisions ---
             if check_collision():
